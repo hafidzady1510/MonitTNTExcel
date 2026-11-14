@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Input Petty Cash</title>
+<style>
+:root{--bg:#fafaf7;--fg:#1d1d1b;--mu:#6b6b64;--card:#fff;--bd:#dcdcd4;--ac:#1f6f5c;--acf:#fff;--wr:#a15c00;--sub:#f0f0ea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171715;--fg:#ecece6;--mu:#a0a099;--card:#222220;--bd:#3a3a36;--ac:#4fb59d;--acf:#0d1f1a;--wr:#e0a24a;--sub:#2b2b28}}
+:root[data-theme="dark"]{--bg:#171715;--fg:#ecece6;--mu:#a0a099;--card:#222220;--bd:#3a3a36;--ac:#4fb59d;--acf:#0d1f1a;--wr:#e0a24a;--sub:#2b2b28}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.4rem;margin:0 0 4px}
+.s{color:var(--mu);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+.top{display:flex;flex-wrap:wrap;gap:12px}
+label{display:flex;flex-direction:column;font-size:.85rem;color:var(--mu);gap:3px}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+@media(max-width:620px){.cols{grid-template-columns:1fr}}
+textarea{min-height:200px;resize:vertical;width:100%;box-sizing:border-box;font-size:.95rem}
+.n{font-size:.8rem;color:var(--mu)}
+button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:9px 14px;cursor:pointer}
+button.p{background:var(--ac);color:var(--acf);border-color:var(--ac);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.wr{color:var(--wr)}
+.tw{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border:1px solid var(--bd);padding:5px 8px;text-align:center;white-space:nowrap}
+th{background:var(--sub)}
+tr.f td{color:var(--mu)}
+td.r{text-align:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Input Petty Cash</h1>
+<p class="s">Isi data dari buku apa adanya. Tanggal otomatis +1 hari dan nominal otomatis +2000. Hasilnya tinggal disalin ke Excel.</p>
+
+<div class="card">
+<div class="top">
+<label>Tanggal di buku<input type="date" id="tg"></label>
+<label>Nomor urut awal (kolom A)<input type="number" id="no" value="346" min="1" style="width:150px"></label>
+<label>Format tanggal<select id="ft"><option value="long">20 October 2026</option><option value="dmy">dd/mm/yyyy</option><option value="iso">yyyy-mm-dd</option></select></label>
+<label style="justify-content:end;flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="fe" checked> sertakan baris 220</label>
+</div>
+<div class="cols">
+<label>Kode unik<textarea id="kd" placeholder="014346&#10;014347"></textarea><span class="n" id="ck">0 baris</span></label>
+<label>Nama driver (tanpa fee driver)<textarea id="nm" placeholder="Andi Ananto&#10;Muhammad Lukman S"></textarea><span class="n" id="cn">0 baris</span></label>
+<label>Nominal (sesuai buku)<textarea id="nl" placeholder="358.000&#10;278.000"></textarea><span class="n" id="cl">0 baris</span></label>
+</div>
+<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="hp">Hapus semua</button><span id="wr" class="wr"></span></div>
+</div>
+
+<div class="card" id="out" hidden>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<button class="p" id="cp">Salin untuk Excel</button>
+<button type="button" class="hp">Hapus semua</button>
+<span id="ms" class="n"></span>
+</div>
+<p class="n" style="margin:8px 0 0">Di Excel, klik sel kolom A baris pertama yang kosong, lalu tempel (Ctrl+V). Kolom yang dilewati (E, F, G) sudah dikosongkan.</p>
+<div class="tw"><table id="tb"></table></div>
+<label style="margin-top:12px">Teks yang disalin (kalau tombol salin tidak jalan, blok semua lalu Ctrl+C)<textarea id="tx" readonly style="min-height:90px"></textarea></label>
+</div>
+</main>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var rows=[];
+try{var sv=localStorage.getItem("pc_no");if(sv)$("no").value=sv}catch(e){}
+function lines(id){return $(id).value.split(/\r?\n/).map(function(s){return s.trim()}).filter(Boolean)}
+function digits(s){return s.replace(/\D/g,"")}
+function p2(n){return (n<10?"0":"")+n}
+function fmtRp(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,".")}
+function calc(){
+  var k=lines("kd"),n=lines("nm"),l=lines("nl");
+  $("ck").textContent=k.length+" baris";$("cn").textContent=n.length+" baris";$("cl").textContent=l.length+" baris";
+  var wr="",ok=true;
+  if(!k.length&&!n.length&&!l.length){ok=false}
+  else if(!$("tg").value){wr="Isi tanggal di buku dulu.";ok=false}
+  else if(!(k.length===n.length&&n.length===l.length)){wr="Jumlah baris belum sama: kode "+k.length+", nama "+n.length+", nominal "+l.length+".";ok=false}
+  else if(!k.length){ok=false}
+  else{
+    var bad=[];
+    k.forEach(function(x,i){if(!digits(x))bad.push("kode "+(i+1));if(!digits(l[i]))bad.push("nominal "+(i+1))});
+    if(bad.length){wr="Tidak terbaca: "+bad.join(", ");ok=false}
+  }
+  $("wr").textContent=wr;
+  rows=[];
+  if(ok){
+    var q=$("tg").value.split("-").map(Number);
+    var d=new Date(q[0],q[1]-1,q[2]+1);
+    var f=$("ft").value,ds=f==="long"?d.getDate()+" "+["January","February","March","April","May","June","July","August","September","October","November","December"][d.getMonth()]+" "+d.getFullYear():f==="iso"?d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate()):p2(d.getDate())+"/"+p2(d.getMonth()+1)+"/"+d.getFullYear();
+    var no=parseInt($("no").value,10)||1;
+    k.forEach(function(x,i){
+      rows.push({a:no+i,b:ds,c:parseInt(digits(x),10),d:"FEE DRIVER "+n[i].toUpperCase(),h:parseInt(digits(l[i]),10)+2000});
+      if($("fe").checked)rows.push({a:"",b:ds,c:"",d:"",h:220,f:1});
+    });
+  }
+  render();
+}
+function render(){
+  $("out").hidden=!rows.length;
+  if(!rows.length)return;
+  var h="<tr><th>A</th><th>B Tanggal</th><th>C Kode</th><th>D Nama</th><th>H Kredit</th></tr>";
+  rows.forEach(function(r){
+    h+="<tr"+(r.f?' class="f"':"")+"><td>"+r.a+"</td><td>"+r.b+"</td><td>"+r.c+"</td><td>"+r.d.replace(/&/g,"&amp;").replace(/</g,"&lt;")+'</td><td class="r">'+fmtRp(r.h)+"</td></tr>";
+  });
+  $("tb").innerHTML=h;
+  $("tx").value=rows.map(function(r){return [r.a,r.b,r.c,r.d,"","","",r.h].join("\t")}).join("\n");
+}
+["kd","nm","nl","tg","no","ft","fe"].forEach(function(i){$(i).addEventListener("input",calc);$(i).addEventListener("change",calc)});
+$("no").addEventListener("change",function(){try{localStorage.setItem("pc_no",$("no").value)}catch(e){}});
+Array.prototype.forEach.call(document.querySelectorAll(".hp"),function(b){b.onclick=function(){
+  var last=rows.filter(function(r){return r.a!==""}).pop();
+  if(last){$("no").value=last.a+1;try{localStorage.setItem("pc_no",$("no").value)}catch(e){}}
+  ["kd","nm","nl","tg"].forEach(function(i){$(i).value=""});
+  $("ms").textContent="";calc();$("kd").focus();
+}});
+$("cp").onclick=function(){
+  var t=$("tx").value,ms=$("ms");
+  function fb(){$("tx").focus();$("tx").select();var ok=false;try{ok=document.execCommand("copy")}catch(e){}ms.textContent=ok?"Tersalin.":"Gagal menyalin otomatis. Teks sudah diblok, tekan Ctrl+C."}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){ms.textContent="Tersalin."},fb)}else fb();
+};
+})();
+</script>
+</body>
+</html>
